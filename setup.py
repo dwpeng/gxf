@@ -5,7 +5,7 @@ __version__ = '0.0.1'
 __author__ = 'dwpeng'
 __email__ = '1732889554@qq.com'
 
-with open('README.md', 'r') as fp:
+with open('README', 'r') as fp:
     readme = fp.read()
 
 setup(
