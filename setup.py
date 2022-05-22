@@ -1,7 +1,7 @@
 from setuptools import setup
 from setuptools import find_packages
 
-__version__ = '0.0.1'
+__version__ = '0.0.3'
 __author__ = 'dwpeng'
 __email__ = '1732889554@qq.com'
 
@@ -19,7 +19,7 @@ setup(
     long_description=readme,
     long_description_content_type='text/markdown',
     url='https://github.com/dwpeng/gxf',
-    keyword=['GFF', 'GTF'],
+    keywords=['GFF', 'GTF'],
     packages=find_packages('src'),
     package_dir={"": "src"},
     install_requires=[

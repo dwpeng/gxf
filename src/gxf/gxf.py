@@ -5,7 +5,7 @@ import pandas as pd
 
 class GXFColmuns:
     _colmuns = [
-        'seq_id',
+        'chr_id',
         'source',
         'type',
         'start',
