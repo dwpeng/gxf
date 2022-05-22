@@ -19,7 +19,7 @@ setup(
     long_description=readme,
     long_description_content_type='text/markdown',
     url='https://github.com/dwpeng/gxf',
-    keyword='GFF',
+    keyword=['GFF', 'GTF'],
     packages=find_packages(),
     install_requires=[
         'pandas',
@@ -40,6 +40,3 @@ setup(
         'Topic :: Software Development :: Libraries'
     ]
 )
-
-
-print(find_packages())
