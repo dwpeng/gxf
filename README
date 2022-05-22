@@ -1,5 +1,5 @@
 
-gxf is a gtf/gff parser based pandas.
+gxf is a fast gtf/gff parser based pandas.
 
 ## GFF/GTF file format
 
