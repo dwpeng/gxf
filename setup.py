@@ -20,7 +20,8 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/dwpeng/gxf',
     keyword=['GFF', 'GTF'],
-    packages=find_packages(),
+    packages=find_packages('src'),
+    package_dir={"": "src"},
     install_requires=[
         'pandas',
     ],
