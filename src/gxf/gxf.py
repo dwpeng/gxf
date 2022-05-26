@@ -1,34 +1,26 @@
 # -*- coding:utf-8 -*-
 
+import enum
 import pandas as pd
 
+from .field import GXFColmuns
+from .operator import make_query
+from .util import (
+    convert_to_gff,
+    convert_to_gtf,
+    green,
+    red,
+    register_method,
+    split_by_double_dash
+)
 
-class GXFColmuns:
-    _colmuns = [
-        'chr_id',
-        'source',
-        'type',
-        'start',
-        'end',
-        'score',
-        'strand',
-        'phase',
-        'attributes'
-    ]
+REGISTER = '__register'
 
-    def __init__(self):
-        for col in self._colmuns:
-            self.__dict__[col] = col
 
-    def __len__(self):
-        return len(self._colmuns)
-
-    def __iter__(self):
-        return iter(self._colmuns)
-
-    @property
-    def columns(self):
-        return self._colmuns
+class GXFType(enum.Enum):
+    GTF = 0
+    GFF = 1
+    UNKNOWN = 3
 
 
 class GXFReader:
@@ -60,15 +52,12 @@ class GXFReader:
             **self.kwargs
         )
 
-        df.iloc[:, 2] = df.iloc[:, 2].map(lambda x: str(x).lower())
-        df.iloc[:, 6] = df.iloc[:, 6].map(self.strand)
-        df[self.columns.strand] = df[self.columns.strand].astype(int)
-
         return df
 
 
 class GXF:
     columns = GXFColmuns()
+    gxf_type = None
 
     def __init__(
         self,
@@ -81,6 +70,7 @@ class GXF:
         self.comment = comment
         self.skiprows = skiprows
         self.sep = sep
+        self._register_handle = []
         if read_cls is None:
             read_cls = GXFReader
         elif not isinstance(read_cls, GXFReader):
@@ -94,15 +84,28 @@ class GXF:
             }).df
         elif isinstance(filename, GXFReader):
             self.df = filename.df
-        elif type(filename) is pd.DataFrame:
+        elif isinstance(filename, pd.DataFrame):
             self.df = filename
         else:
             raise TypeError(
                 'filename expect a str or GXFReader type, but got a %s' % type(filename))
+        if not len(self):
+            self.gxf_type = GXFType.UNKNOWN
+        else:
+            self.gxf_type = GXFType.GFF if self.df.iloc[0, [-1]].map(
+                lambda x: '=' in x
+            ).any() else GXFType.GTF
 
     def _do_handle(self, where):
         for col in self.columns:
             handle_name = '%s_handle_%s' % (where, col)
+            register_handle_name = handle_name + REGISTER
+
+            if hasattr(self, register_handle_name):
+                handle = getattr(self, register_handle_name)
+                self.df[col] = self.df[col].map(handle)
+                self._register_handle.append(register_handle_name)
+                break
 
             if hasattr(self, handle_name):
                 handle = getattr(self, handle_name)
@@ -115,50 +118,48 @@ class GXF:
             skiprows=self.skiprows,
             sep=self.sep
         )
-
-        # bind method to new GXF class
-        for col in self.columns:
-            before = 'before_handle_%s' % col
-            after = 'after_handle_%s' % col
-            if hasattr(self, before):
-                setattr(gxf, before, getattr(self, before))
-            if hasattr(self, after):
-                setattr(gxf, after, getattr(self, after))
+        # # bind method to new GXF class
+        # for col in self.columns:
+        #     before = 'before_handle_%s' % col
+        #     after = 'after_handle_%s' % col
+        #     if hasattr(self, before):
+        #         setattr(gxf, before, getattr(self, before))
+        #     if hasattr(self, after):
+        #         setattr(gxf, after, getattr(self, after))
         return gxf
 
     def filter(self, **kwargs):
-        lambda_oper = {
-            'gt': '>',
-            'eq': '==',
-            'ne': '!=',
-            'lt': '<',
-            'ge': '>=',
-            'le': '<='
-        }
 
-        lambda_expr = []
+        processes = []
+
         for k, v in kwargs.items():
-            if '__' not in k:
-                k = k + lambda_oper['eq']
-            else:
-                k, oper = k.split('__')
-                if oper not in lambda_oper:
-                    continue
-                k = k + lambda_oper[oper]
-            if isinstance(v, (int, float)):
-                v = v
-            if isinstance(v, str):
-                v = '"' + v.strip("'").strip('"') + '"'
-            lambda_expr.append('%s%s' % (k, v))
-        query = '&'.join(lambda_expr)
-        return self[query]
+            field_name, oper, when, handle = split_by_double_dash(k)
+            if field_name not in self.columns:
+                print()
+                print('Only the following field names are supported.')
+                for col in self.columns:
+                    print('*: ' + green('%s' % col))
+                print('But got: %s.' % red(field_name))
+                exit(1)
 
-    def __getitem__(self, cond):
+            if when:
+                method_name = when + '_handle_' + field_name + REGISTER
+                register_method(self, method_name, handle)
+
+            processes.append(make_query(field_name, oper, v, when, handle))
+
+        # main process
         self._do_handle('before')
-        new_df = self.df.query(cond).reset_index(drop=True).copy()
-        new_gxf = self._clone(new_df)
-        new_gxf._do_handle('after')
-        return new_gxf
+        new_df = self.df
+        for process in processes:
+            new_df = process(new_df)
+        self._do_handle('after')
+
+        for handle_name in self._register_handle:
+            delattr(self, handle_name)
+        self._register_handle.clear()
+
+        return self._clone(new_df)
 
     def __str__(self):
         return str(self.df)
@@ -167,5 +168,34 @@ class GXF:
     def dtypes(self):
         return self.df.dtypes
 
+    def to_dict(self):
+        return self.df.to_dict('records')
+
     def __len__(self):
         return self.df.shape[0]
+
+    def to_gff3(self, filename):
+        if self.gxf_type != GXFType.GFF:
+            self.df[self.columns.attributes] = self.df[self.columns.attributes].map(
+                convert_to_gff)
+        self.df.to_csv(
+            filename,
+            index=None,
+            header=None,
+            columns=self.columns,
+            sep='\t',
+        )
+
+    def to_gtf(self, filename):
+        if self.gxf_type != GXFType.GTF:
+            self.df[self.columns.attributes] = self.df[self.columns.attributes].map(
+                convert_to_gtf)
+        file = open(filename, 'w', encoding='utf-8')
+        for line in self.to_dict():
+            line_str = []
+            for col in self.columns:
+                line_str.append(
+                    str(line.get(col, ''))
+                )
+            file.write('\t'.join(line_str) + '\n')
+        file.close()

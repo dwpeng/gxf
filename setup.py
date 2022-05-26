@@ -1,9 +1,7 @@
 from setuptools import setup
 from setuptools import find_packages
 
-__version__ = '0.0.4'
-__author__ = 'dwpeng'
-__email__ = '1732889554@qq.com'
+from src.gxf import __author__, __email__, __version__
 
 with open('README', 'r', encoding='utf-8') as fp:
     readme = fp.read()
