@@ -52,11 +52,20 @@ class Operator(object):
         self.field_name = field_name
         self.oper = oper
         self.value = value
-        self.when= when
+        self.when = when
         self.handle = handle
 
     def __call__(self, df):
-        raise NotImplementedError()
+        df = self.when_handle(df, 'before')
+        return self.when_handle(self.do_oper(df), 'after')
+
+    def do_oper(self, df):
+        raise NotImplementedError
+
+    def when_handle(self, df, when):
+        if self.when and self.when == when:
+            df[self.field_name] = df[self.field_name].map(self.handle)
+        return df
 
     def __str__(self):
 
@@ -69,12 +78,16 @@ class Operator(object):
             self.handle and self.handle.__name__
         )
 
+
 class EmptyOper(Operator):
 
     def __init__(self, field_name, oper, value, when=None, handle=None):
         pass
 
     def __call__(self, df):
+        return df
+
+    def do_oper(self, df):
         return df
 
 
@@ -92,8 +105,7 @@ class MapOper(Operator):
         self.oper = oper
         self.value = value
 
-
-    def __call__(self, df):
+    def do_oper(self, df):
         df[self.field_name] = df[self.field_name].map(self.value)
         return df
 
@@ -107,7 +119,7 @@ class InOper(Operator):
         self.oper = oper
         self.value = value
 
-    def __call__(self, df):
+    def do_oper(self, df):
         query = df[self.field_name].isin(self.value)
         if self.oper == 'notin':
             return df[~query].reset_index(drop=True).copy()
@@ -123,7 +135,7 @@ class QueryOper(Operator):
         self.oper = lambda_query_oper[oper]
         self.value = value
 
-    def __call__(self, df):
+    def do_oper(self, df):
         if self.oper == 're':
             return df[
                 df[self.field_name].map(
@@ -151,5 +163,3 @@ def make_query(field_name, oper, value, when=None, handle=None):
     if oper in lambda_query_oper:
         return QueryOper(field_name, oper, value, when, handle)
     return EmptyOper(field_name, oper, value, when, handle)
-
-

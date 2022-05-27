@@ -1,7 +1,7 @@
 
 from .operator import (
-    lambda_handle, 
-    lambda_oper, 
+    lambda_handle,
+    lambda_oper,
     lambda_when
 )
 from collections import namedtuple
@@ -57,8 +57,10 @@ def register_method(self, method_name, method):
 def green(s):
     return '\033[92m' + str(s) + '\033[0m'
 
+
 def red(s):
     return '\033[31m' + str(s) + '\033[0m'
+
 
 def convert_to_gff(x):
     ret = []
@@ -69,13 +71,13 @@ def convert_to_gff(x):
         )
     return ';'.join(ret)
 
+
 def convert_to_gtf(x):
     ret = []
     for pair in x.split(';'):
         key, value = pair.split('=')
-        x = key + ' ' + '"' + value.strip('"') + '"'
         ret.append(
-            x
+            key + ' ' + '"' + value.strip('"') + '"'
         )
     return ';'.join(ret)
 

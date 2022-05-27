@@ -70,7 +70,6 @@ class GXF:
         self.comment = comment
         self.skiprows = skiprows
         self.sep = sep
-        self._register_handle = []
         if read_cls is None:
             read_cls = GXFReader
         elif not isinstance(read_cls, GXFReader):
@@ -99,13 +98,6 @@ class GXF:
     def _do_handle(self, where):
         for col in self.columns:
             handle_name = '%s_handle_%s' % (where, col)
-            register_handle_name = handle_name + REGISTER
-
-            if hasattr(self, register_handle_name):
-                handle = getattr(self, register_handle_name)
-                self.df[col] = self.df[col].map(handle)
-                self._register_handle.append(register_handle_name)
-                break
 
             if hasattr(self, handle_name):
                 handle = getattr(self, handle_name)
@@ -142,10 +134,6 @@ class GXF:
                 print('But got: %s.' % red(field_name))
                 exit(1)
 
-            if when:
-                method_name = when + '_handle_' + field_name + REGISTER
-                register_method(self, method_name, handle)
-
             processes.append(make_query(field_name, oper, v, when, handle))
 
         # main process
@@ -155,9 +143,6 @@ class GXF:
             new_df = process(new_df)
         self._do_handle('after')
 
-        for handle_name in self._register_handle:
-            delattr(self, handle_name)
-        self._register_handle.clear()
 
         return self._clone(new_df)
 
